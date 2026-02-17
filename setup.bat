@@ -1,91 +1,129 @@
 @echo off
-title Anki Deck Generator
+title Ankreator v5.0 - Auto Setup
 
-:: Navigate to the directory where this script is located
+:: ===================================================================
+::  Ankreator v5.0 Setup Script
+::  1. Auto-installs Python 3.11 if missing.
+::  2. Creates Virtual Environment & Installs Requirements.
+::  3. Creates a Desktop Shortcut with your Icon.
+:: ===================================================================
+
 cd /d "%~dp0"
+echo.
+echo [1/4] Checking System Requirements...
 
-echo ==========================================================
-echo            Anki Deck Generator by Furey
-echo ==========================================================
+:: --- CHECK FOR PYTHON ---
+python --version >nul 2>&1
+if %errorlevel% equ 0 goto :FOUND_PYTHON
+
+echo.
+echo [!] Python is not installed. 
+echo     Downloading Python 3.11 automatically...
 echo.
 
-:: --- Check if setup has already been completed ---
-IF EXIST "._setup_complete_flag" (
-    goto LaunchApp
+:: 1. Download Python 3.11 Installer (Silent)
+curl -o python_installer.exe https://www.python.org/ftp/python/3.11.9/python-3.11.9-amd64.exe
+
+if not exist python_installer.exe (
+    echo [ERROR] Download failed. Please install Python manually from python.org.
+    pause
+    exit /b 1
 )
 
-:: --- First-Time Setup Logic ---
-echo This appears to be your first time running the application.
-echo Performing one-time setup...
+echo.
+echo [!] Installing Python 3.11...
+echo     (A window may pop up asking for permission - please click Yes)
 echo.
 
-echo [1/5] Bootstrapping package manager (pip)...
-call ".\binaries\windows\python\python.exe" -c "import urllib.request; urllib.request.urlretrieve('https://bootstrap.pypa.io/get-pip.py', 'get-pip.py')"
-call ".\binaries\windows\python\python.exe" get-pip.py
-del get-pip.py
+:: 2. Install Python (Silent Mode)
+python_installer.exe /quiet PrependPath=1 Include_test=0 Include_tcltk=0 InstallAllUsers=0
+
+:: 3. Cleanup
+del python_installer.exe
+
+:: 4. Force Path Refresh
+echo.
+echo [!] Refreshing Environment...
+set "PATH=%PATH%;%LOCALAPPDATA%\Programs\Python\Python311;%LOCALAPPDATA%\Programs\Python\Python311\Scripts"
+
+:: 5. Verification
+python --version >nul 2>&1
 if %errorlevel% neq 0 (
-    echo. & echo ERROR: Failed to install pip. & goto End
+    if exist "%LOCALAPPDATA%\Programs\Python\Python311\python.exe" (
+        set "PYTHON_CMD=%LOCALAPPDATA%\Programs\Python\Python311\python.exe"
+        goto :FOUND_PYTHON_MANUAL
+    )
+    echo [ERROR] Could not find Python after install. 
+    echo Please close this window and run 'setup.bat' again.
+    pause
+    exit
 )
-echo      ...Package manager installed.
-echo.
 
-echo [2/5] Installing core build packages (setuptools, wheel, pywin32)...
-call ".\binaries\windows\python\python.exe" -m pip install setuptools wheel pywin32
-if %errorlevel% neq 0 (
-    echo. & echo ERROR: Failed to install core build tools. & goto End
-)
-echo      ...Build tools installed.
-echo.
+:FOUND_PYTHON
+set "PYTHON_CMD=python"
 
-:: --- NEW STEP: Install winshell directly from the local .whl file ---
-echo [3/5] Installing Windows shortcut utility (winshell)...
-call ".\binaries\windows\python\python.exe" -m pip install ".\binaries\windows\winshell-0.6-py2.py3-none-any.whl"
-if %errorlevel% neq 0 (
-    echo. & echo ERROR: Failed to install the winshell package from local file. & goto End
-)
-echo      ...Shortcut utility installed.
-echo.
-:: --- END NEW STEP ---
+:FOUND_PYTHON_MANUAL
+echo     Python found! Proceeding...
 
-echo [4/5] Installing all other required Python packages...
-:: --- ADDED --no-warn-script-location to suppress yellow warnings ---
-call ".\binaries\windows\python\python.exe" -m pip install --no-warn-script-location -r requirements.txt
-if %errorlevel% neq 0 (
-    echo. & echo ERROR: Package installation failed. & goto End
-)
-echo      ...All packages installed successfully.
+:: --- VIRTUAL ENV ---
 echo.
-
-echo [5/5] Creating desktop shortcut...
-powershell.exe -ExecutionPolicy Bypass -Command "$ws = New-Object -ComObject WScript.Shell; $sLinkFile = Join-Path -Path $ws.SpecialFolders('Desktop') -ChildPath 'Anki Deck Generator.lnk'; $oLink = $ws.CreateShortcut($sLinkFile); $oLink.TargetPath = '%~f0'; $oLink.WorkingDirectory = '%~dp0'; $oLink.IconLocation = '%~dp0icon.ico, 0'; $oLink.Save()"
-    
-if %errorlevel% neq 0 (
-    echo      ...WARNING: Failed to create desktop shortcut. You can run this file directly.
+echo [2/4] Checking Virtual Environment...
+if exist ".\venv\Scripts\python.exe" (
+    echo     Virtual Environment already exists. Skipping creation.
 ) else (
-    echo      ...Shortcut created successfully on your Desktop!
+    echo     Creating venv...
+    "%PYTHON_CMD%" -m venv venv
+    if %errorlevel% neq 0 (
+        echo [ERROR] Failed to create venv.
+        pause
+        exit /b 1
+    )
+)
+
+:: --- INSTALL REQUIREMENTS ---
+echo.
+echo [3/4] Installing Dependencies...
+echo     (This may take a few minutes for AI libraries...)
+echo.
+
+".\venv\Scripts\python.exe" -m pip install --upgrade pip
+".\venv\Scripts\python.exe" -m pip install -r requirements.txt
+
+if %errorlevel% neq 0 (
+    echo.
+    echo [ERROR] Installation failed. Check the error message above.
+    pause
+    exit /b 1
+)
+
+:: --- CREATE SHORTCUT ---
+echo.
+echo [4/4] Creating Desktop Shortcut...
+
+set "TARGET_SCRIPT=%~dp0Start Anki Generator.bat"
+set "ICON_FILE=%~dp0icon.ico"
+set "WORK_DIR=%~dp0"
+
+:: 1. Dynamic Desktop Search (Fixes OneDrive Issues)
+::    This asks Windows where the "Real" Desktop is.
+for /f "usebackq tokens=*" %%D in (`powershell -command "[Environment]::GetFolderPath('Desktop')"` ) do set "REAL_DESKTOP=%%D"
+
+set "SHORTCUT_PATH=%REAL_DESKTOP%\Ankreator.lnk"
+
+:: 2. Create the Shortcut using the discovered path
+powershell -Command "$ws = New-Object -ComObject WScript.Shell; $s = $ws.CreateShortcut('%SHORTCUT_PATH%'); $s.TargetPath = '%TARGET_SCRIPT%'; $s.IconLocation = '%ICON_FILE%'; $s.WorkingDirectory = '%WORK_DIR%'; $s.Save()"
+
+if %errorlevel% neq 0 (
+    echo.
+    echo [WARNING] Could not create shortcut automatically.
+    echo Please right-click 'Start Anki Generator.bat' and select 'More options -> Send to -> Desktop (create shortcut)'.
+) else (
+    echo.
+    echo ===================================================
+    echo    SETUP COMPLETE! 
+    echo    1. You can close this window.
+    echo    2. Look for the 'Ankreator' shortcut on your Desktop.
+    echo ===================================================
 )
 echo.
-
-echo [6/6] Finalizing setup...
-:: Create the flag file to skip this block next time
-echo SETUP_COMPLETE > "._setup_complete_flag"
-echo.
-echo Setup is complete! Launching the application now...
-timeout /t 2 >nul
-
-:LaunchApp
-echo Launching the application... Please wait for the browser window to open.
-
-:: Temporarily add our bundled Tesseract to the PATH for this session
-set "PATH=.\binaries\windows\tesseract;%PATH%"
-
-:: Run the app using our bundled Python, hiding the console window
-call ".\binaries\windows\python\python.exe" app.py
-pause
-
-exit
-
-:End
-echo.
-echo Setup failed. Please resolve the error above and run this script again.
 pause
