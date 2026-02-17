@@ -432,7 +432,7 @@ def get_smart_recommendations(specs):
         ("qwen3:1.7b", "1.5GB", 4, "Light "),
         ("gemma3:4b", "3.3GB", 6, "Balanced "),
         ("qwen3:4b", "3.0GB", 6, "Balanced "),
-        ("emma3:latest", "3.3GB", 6, "Balanced "),
+        ("gemma3:latest", "3.3GB", 6, "Balanced "),
         ("gemma3n:e2b", "5.6GB", 8, "Mid-Range "),
         ("qwen3:8b", "5.5GB", 8, "Mid-Range "),
         ("gemma3n:e4b", "7.5GB", 12, "High-End "),
