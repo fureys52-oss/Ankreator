@@ -272,7 +272,7 @@ class LLMService:
 
     def run_markdown_harvester(self, markdown_text, progress_callback=None):
         import re
-        
+        target_lang = self.settings.get("pdf_language", "English")
         # 1. Split text into logical pages
         raw_pages = re.split(r'(?=\n--- Page \d+ ---)', markdown_text)
         pages = [p for p in raw_pages if p.strip()]
@@ -297,6 +297,7 @@ class LLMService:
                 progress_callback(i + 1, total_batches)
 
             prompt = self.prompt_harvester.format(text_chunk=chunk)
+            prompt += f"\n\nExtract and write all facts in {target_lang}."
             
             schema = {
                 "type": "object", 
@@ -655,6 +656,9 @@ class LLMService:
         
         from prompts import MULTI_CARD_SCHEMA, SINGLE_CARD_SCHEMA
         
+        target_lang = self.settings.get("pdf_language", "English")
+        lang_instruction = f"\n\nCRITICAL: You MUST write all content (Front, Back, Topic) in {target_lang}."
+
         for i, chunk in enumerate(chunks):
             if progress_callback: progress_callback(i + 1, total_chunks)
             
@@ -669,7 +673,7 @@ class LLMService:
             # Select Schema & Context based on Batch Size
             if batch_size > 1:
                 current_schema = MULTI_CARD_SCHEMA
-                prompt = prompt_template.format(bundles_block=bundles_text)
+                prompt = prompt_template.format(bundles_block=bundles_text) + lang_instruction
             else:
                 current_schema = SINGLE_CARD_SCHEMA
                 grp = chunk[0]
@@ -681,7 +685,7 @@ class LLMService:
                     bundle_id=str(grp.get('group_id', '1')),
                     subject=grp.get('subject', 'Medical Concept'),
                     context=grp.get('subject', 'Medical Concept')
-                )
+                ) + lang_instruction
 
             # 3. Generation Loop (UPDATED RETRY LOGIC)
             # range(3) = Attempt 1, Retry 1, Retry 2
@@ -744,6 +748,7 @@ class LLMService:
 
     def generate_cloze_batch(self, groups_list):
         self.log(f"   > [Cloze] Processing {len(groups_list)} cloze lists...")
+        target_lang = self.settings.get("pdf_language", "English")
         output_cards = []
         target_count = int(self.settings.get("cloze_keyword_count", 5))
         for group in groups_list:
@@ -752,7 +757,7 @@ class LLMService:
                 subject=group.get('subject'),
                 facts_block=facts_str,
                 count=target_count,
-            )
+            ) + f"\n\nCRITICAL: Write all content in {target_lang}."
             result = self._call_llm(
                 [{"role": "user", "content": prompt}], 
                 temperature=0.1,
@@ -767,7 +772,8 @@ class LLMService:
         
         target_count = int(self.settings.get("cloze_keyword_count", 5))
         generated_cards = []
-        
+        target_lang = self.settings.get("pdf_language", "English")
+        lang_instruction = f"\n\nCRITICAL: Write the Topic and Prose in {target_lang}."
         for i, grp in enumerate(groups):
             # [NEW] Update Progress
             if progress_callback:
@@ -787,7 +793,7 @@ class LLMService:
                     subject=grp.get('subject', 'General'),
                     context=grp.get('context', 'General'),
                     facts_block=facts_block
-                )
+                ) + lang_instruction
             except KeyError as e:
                 self.log(f"   > [Creator Error] Prompt formatting failed: {e}")
                 continue

@@ -235,6 +235,12 @@ def build_ui(settings, version="5.0", **kwargs):
                         
                         def toggle_objectives(choice):
                             return gr.update(visible=(choice == "Focus on Provided Objectives"))
+                        with gr.Row():
+                                pdf_language = gr.Dropdown([
+                                        "English", "Spanish", "French", "German", "Italian", 
+                                        "Portuguese", "Chinese (Mandarin)", "Japanese", "Korean", 
+                                        "Russian", "Arabic", "Hindi", "Turkish", "Dutch", "Polish",
+                                        "Vietnamese", "Indonesian"], label="Language", value=loaded_settings.get("pdf_language", "English"), interactive=True, info="Select the language output for the generated cards.")
                         
                         content_strategy.change(fn=toggle_objectives, inputs=content_strategy, outputs=objectives_manual_input)
                         gr.Markdown("### 3. Name Your Decks")
@@ -533,7 +539,6 @@ def build_ui(settings, version="5.0", **kwargs):
                             c_neg = gr.ColorPicker(label="Negative", value=loaded_settings.get("c_neg", "#F87171"))      
                         
                         custom_tags_textbox = gr.Textbox(label="Anki Tags", value=loaded_settings.get("custom_tags", ""), info="Tags added to every card (comma separated).")
-                        pdf_language_dropdown = gr.Dropdown(["English", "Spanish", "French", "German", "Portuguese"], label="PDF Language", value=loaded_settings.get("pdf_language", "English"))
                         btn_reset_style.click(
                         lambda: [
                             DEFAULTS["style_anatomy"], DEFAULTS["style_drugs"], DEFAULTS["style_pathology"],
@@ -544,7 +549,7 @@ def build_ui(settings, version="5.0", **kwargs):
                         outputs=[
                             style_anatomy, style_drugs, style_pathology,
                             c_structure, c_topic, c_data, c_anatomy, c_pharma, c_process, c_pos, c_neg,
-                            custom_tags_textbox, pdf_language_dropdown
+                            custom_tags_textbox
                         ]
                     )
                     # D. SURGEON
@@ -628,7 +633,7 @@ def build_ui(settings, version="5.0", **kwargs):
             prompt_harvester, prompt_librarian, prompt_creator, prompt_critic,
             style_anatomy, style_drugs, style_pathology,
             c_structure, c_topic, c_data, c_anatomy, c_pharma, c_process, c_pos, c_neg,
-            custom_tags_textbox, pdf_language_dropdown,
+            custom_tags_textbox, pdf_language,
             content_strategy, objectives_manual_input
         ]
 
@@ -657,7 +662,7 @@ def build_ui(settings, version="5.0", **kwargs):
             prompt_harvester, prompt_librarian, prompt_creator, prompt_critic,
             style_anatomy, style_drugs, style_pathology,
             c_structure, c_topic, c_data, c_anatomy, c_pharma, c_process, c_pos, c_neg,
-            custom_tags_textbox, pdf_language_dropdown,
+            custom_tags_textbox, pdf_language,
             content_strategy, objectives_manual_input
         ]
         
